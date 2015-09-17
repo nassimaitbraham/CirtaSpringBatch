@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:batch="http://www.springframework.org/schema/batch"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+	http://www.springframework.org/schema/beans/spring-beans.xsd
+	http://www.springframework.org/schema/batch
+    http://www.springframework.org/schema/batch/spring-batch-3.0.xsd
+	http://www.springframework.org/schema/tx
+    http://www.springframework.org/schema/tx/spring-tx-3.0.xsd">
+
+
+	<!--************************************************************************************************* 
+	*							                    									            	*
+	*  						Fichier de configurations de spring batch			                        *
+	*				(Une leger modification de la config est necissaire si on veut ajouter des          *
+	*            transaction avec une base de donnee c'est a dire declaration d'un datasource ...etc)   *
+	*																									*
+	 **************************************************************************************************-->
+	
+	<!-- Configuration du ItemReader permettat de lire un fichier plat en l'occurence 
+		un csv ici -->
+
+	<bean id="userReaderCSV" class="org.springframework.batch.item.file.FlatFileItemReader">
+		<property name="resource" value="input/users.txt" />
+		<property name="lineMapper">
+			<bean class="org.springframework.batch.item.file.mapping.DefaultLineMapper">
+				<property name="lineTokenizer">
+					<bean
+						class="org.springframework.batch.item.file.transform.DelimitedLineTokenizer">
+						<property name="delimiter" value="," />
+						<property name="names" value="id,nom,prenom,addresse" />
+					</bean>
+				</property>
+				<property name="fieldSetMapper">
+					<bean
+						class="org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper">
+						<property name="targetType" value="com.aitech.cirta.model.Users" />
+					</bean>
+				</property>
+			</bean>
+		</property>
+	</bean>
+
+	<!-- Declaration de l'ItemWriter -->
+	<bean id="userWriter" class="com.aitech.cirta.writer.UserBatchItemWriter">
+	</bean>
+
+	<!-- Declaration de l'itemProcessor -->
+	<bean id="userProcessor" class="com.aitech.cirta.processor.UserProcessor" />
+
+
+
+	<!-- Declaration du job Launcher -->
+	<bean id="jobLauncher"
+		class="org.springframework.batch.core.launch.support.SimpleJobLauncher">
+		<property name="jobRepository" ref="jobRepository" />
+	</bean>
+
+	<!-- déclaration du depot de job Cette implementation necessite le gestionnaire 
+		de transactions qu'on lui inject avec ref="transactionManager" -->
+
+	<bean id="jobRepository"
+		class="org.springframework.batch.core.repository.support.MapJobRepositoryFactoryBean">
+		<property name="transactionManager" ref="transactionManager" />
+	</bean>
+
+	<!-- Declaration du gestionnaire de transaction de transactions vide, Spring Batch étant fortement 
+		transactionnel, le gestionnaire de transactions est une dépendance essentielle 
+		-->
+	<bean id="transactionManager"
+		class="org.springframework.batch.support.transaction.ResourcelessTransactionManager">
+	</bean>
+
+	<!-- Activation des anonations pour les transactions -->
+	<tx:annotation-driven transaction-manager="transactionManager" />
+	
+	<!--Definition d'un job spring batch  -->
+    <job id="importUsers" xmlns="http://www.springframework.org/schema/batch">
+		<step id="readWriteUser">
+			<tasklet>
+				<chunk reader="userReaderCSV" writer="userWriter" processor="userProcessor"
+					commit-interval="2" />
+			</tasklet>
+		</step>
+	</job>
+
+
+
+
+</beans>
